@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const utils = @import("./utils.zig");
+
 const InitMsg = struct { src: []const u8, dest: []const u8, body: struct { type: []const u8, msg_id: u32, node_id: []const u8, node_ids: [][]const u8 } };
 
 // Utility method for sending a response via stdout
@@ -52,10 +54,7 @@ pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, alloca
                     .in_reply_to = initMsg.body.msg_id,
                 } };
 
-                // Stringify the above response and write to stdout
-                var string = std.ArrayList(u8).init(allocator);
-                try std.json.stringify(response, .{}, string.writer());
-                try write(out, allocator, string.items);
+                try write(out, allocator, try utils.stringify(response, allocator));
             } else {
                 const response = try f(msgId, m, nodeId, allocator);
                 try write(out, allocator, response);

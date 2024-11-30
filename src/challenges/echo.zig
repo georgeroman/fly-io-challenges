@@ -1,10 +1,9 @@
 const std = @import("std");
 
-const node = @import("node.zig");
+const node = @import("../node.zig");
+const utils = @import("../utils.zig");
 
 const InMsg = struct { src: []const u8, dest: []const u8, body: struct { type: []const u8, msg_id: u32, echo: []const u8 } };
-
-const OutMsg = struct { src: []const u8, dest: []const u8, body: struct { type: []const u8, msg_id: u32, in_reply_to: u32, echo: []const u8 } };
 
 fn f(msgId: u32, msg: []const u8, nodeId: []const u8, allocator: std.mem.Allocator) ![]const u8 {
     // Parse the raw message into an `InMsg` struct
@@ -20,9 +19,7 @@ fn f(msgId: u32, msg: []const u8, nodeId: []const u8, allocator: std.mem.Allocat
         .in_reply_to = inMsg.body.msg_id,
     } };
 
-    var string = std.ArrayList(u8).init(allocator);
-    try std.json.stringify(response, .{}, string.writer());
-    return string.items;
+    return utils.stringify(response, allocator);
 }
 
 pub fn echo() !void {
