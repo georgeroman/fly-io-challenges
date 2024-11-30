@@ -1,0 +1,9 @@
+# Cache
+.zig-cache
+
+# Build
+zig-out
+
+# Maelstrom
+maelstrom
+store
