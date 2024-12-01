@@ -15,7 +15,7 @@ fn write(f: std.fs.File, allocator: std.mem.Allocator, msg: []const u8) !void {
     msgId += 1;
 }
 
-pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, allocator: std.mem.Allocator) anyerror![]const u8) !void {
+pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, nodeIds: [][]const u8, allocator: std.mem.Allocator) anyerror![][]const u8) !void {
     const in = std.io.getStdIn();
     const out = std.io.getStdOut();
 
@@ -28,6 +28,7 @@ pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, alloca
     const reader = bufferedReader.reader();
 
     var nodeId: []u8 = undefined;
+    var nodeIds = std.ArrayList([]u8).init(allocator);
     while (true) {
         // Read a line for stdin
         var msgBuffer: [4096]u8 = undefined;
@@ -45,8 +46,12 @@ pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, alloca
 
                 // Allocate memory for the node id and copy it from the message data
                 // We cannot use `initMsg.body.node_id` since it will be deallocated at the end of the current scope
-                nodeId = try allocator.alloc(u8, initMsg.body.node_id.len);
-                @memcpy(nodeId[0..initMsg.body.node_id.len], initMsg.body.node_id);
+                nodeId = try std.mem.Allocator.dupe(allocator, u8, initMsg.body.node_id);
+
+                // Same as above but for `initMsg.body.node_ids`
+                for (initMsg.body.node_ids) |nid| {
+                    try nodeIds.append(try std.mem.Allocator.dupe(allocator, u8, nid));
+                }
 
                 const response = .{ .src = nodeId, .dest = initMsg.src, .body = .{
                     .type = "init_ok",
@@ -56,10 +61,15 @@ pub fn run(f: *const fn (msgId: u32, msg: []const u8, nodeId: []const u8, alloca
 
                 try write(out, allocator, try utils.stringify(response, allocator));
             } else {
-                const response = try f(msgId, m, nodeId, allocator);
-                try write(out, allocator, response);
+                const responses = try f(msgId, m, nodeId, nodeIds.items, allocator);
 
-                allocator.free(response);
+                // Send all responses
+                for (responses) |response| {
+                    try write(out, allocator, response);
+                    allocator.free(response);
+                }
+
+                allocator.free(responses);
             }
         }
     }
